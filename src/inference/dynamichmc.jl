@@ -2,7 +2,7 @@ struct DynamicNUTS{AD, T} <: Hamiltonian{AD}
     n_iters   ::  Integer   # number of samples
     space     ::  Set{T}    # sampling space, emtpy means all
 end
-
+using AdvancedHMC
 """
     DynamicNUTS(n_iters::Integer)
 
@@ -57,15 +57,29 @@ function sample(model::Model,
         runmodel!(model, vi, spl)
     end
 
-    function _lp(x)
-        value, deriv = gradient_logp(x, vi, model, spl)
-        return ValueGradient(value, deriv)
+    function logπ(x)::Float64
+        vi[spl] = x
+        return runmodel!(model, vi, spl).logp
     end
 
-    chn_dynamic, _ = NUTS_init_tune_mcmc(FunctionLogDensity(length(vi[spl]), _lp), alg.n_iters)
+
+    function ∂logπ∂θ(x)::Vector{Float64}
+        _, deriv = gradient_logp(x, vi, model, spl)
+        return deriv
+    end
+
+    θ_init = Vector{Float64}(vi[spl])
+    # Define metric space, Hamiltonian and sampling method
+    metric = DiagEuclideanMetric(θ_init)
+    h = AdvancedHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
+    prop = AdvancedHMC.NUTS(Leapfrog(AdvancedHMC.find_good_eps(h, θ_init)))
+    adaptor = StanNUTSAdaptor(2_000, AdvancedHMC.PreConditioner(metric), NesterovDualAveraging(0.8, prop.integrator.ϵ))
+
+    # Sampling
+    asamples = AdvancedHMC.sample(h, prop, θ_init, spl.alg.n_iters, adaptor, 2_000)
 
     for i = 1:alg.n_iters
-        vi[spl] = chn_dynamic[i].q
+        vi[spl] = asamples[i]
         samples[i].value = Sample(vi, spl).value
     end
 

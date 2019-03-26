@@ -70,13 +70,14 @@ function sample(model::Model,
 
     θ_init = Vector{Float64}(vi[spl])
     # Define metric space, Hamiltonian and sampling method
-    metric = DiagEuclideanMetric(θ_init)
+    d = length(θ_init)
+    metric = DenseEuclideanMetric(Matrix{Float64}(LinearAlgebra.I, d, d))
     h = AdvancedHMC.Hamiltonian(metric, logπ, ∂logπ∂θ)
     prop = AdvancedHMC.NUTS(Leapfrog(AdvancedHMC.find_good_eps(h, θ_init)))
-    adaptor = StanNUTSAdaptor(2_000, AdvancedHMC.PreConditioner(metric), NesterovDualAveraging(0.8, prop.integrator.ϵ))
+    adaptor = StanNUTSAdaptor(1_000, AdvancedHMC.PreConditioner(metric), NesterovDualAveraging(0.8, prop.integrator.ϵ))
 
     # Sampling
-    asamples = AdvancedHMC.sample(h, prop, θ_init, spl.alg.n_iters, adaptor, 2_000)
+    asamples = AdvancedHMC.sample(h, prop, θ_init, spl.alg.n_iters, adaptor, 1_000)
 
     for i = 1:alg.n_iters
         vi[spl] = asamples[i]

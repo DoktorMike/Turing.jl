@@ -10,8 +10,8 @@ end
 
 mf = gdemo(1.5, 2.0)
 
-@time chn = sample(mf, DynamicNUTS(100_000));
-@time chn = sample(mf, Turing.NUTS(100_000, 2_000, 0.8));
+@time chn = sample(mf, DynamicNUTS(10_000));
+# @time chn = sample(mf, Turing.NUTS(500_000, 1_000, 0.8));
 
 @test mean(chn[:s].value) ≈ 49/24 atol=0.2
 @test mean(chn[:m].value) ≈ 7/6 atol=0.2
